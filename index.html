@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>テストデータ生成ツール</title>
+        <!-- CSSファイルのリンク -->
+        <link rel="stylesheet" href="./css/style.css">
+    </head>
+    <body>
+        <h1>テストデータ生成ツール</h1>
+
+        <!-- DB選択ボタン -->
+        <div class="button-container">
+            <button id="mysql-button" class="db-button">MySQL</button>
+            <button id="cassandra-button" class="db-button">Apache Cassandra</button>
+        </div>
+
+        <!-- 生成行数の入力フィールド -->
+        <div class="section">
+            <label for="record-count">生成するレコード数:</label>
+            <input type="number" id="record-count" value="10" min="1">
+        </div>
+
+        <!-- 生成ボタン -->
+        <div class="section">
+            <button id="generate-button" class="generate-button" disabled>生成</button>
+        </div>
+
+        <!-- INSERT構文を表示するテキストボックス -->
+        <div class="section">
+            <label for="insert-script">生成されたINSERT構文 (最大10行表示):</label>
+            <textarea id="insert-script" readonly></textarea>
+        </div>
+
+        <!-- ダウンロードボタン -->
+        <div class="section">
+            <button id="download-button" class="download-button" disabled>ダウンロード</button>
+        </div>
+
+        <script type="module">
+            // Faker.jsをESM形式でインポート
+            import { faker } from 'https://esm.sh/@faker-js/faker@v9.3.0';
+
+            // ボタン要素の取得
+            const dbButtons = document.querySelectorAll('.db-button');
+            const generateButton = document.getElementById('generate-button');
+            const downloadButton = document.getElementById('download-button');
+            const insertScript = document.getElementById('insert-script');
+            const recordCountInput = document.getElementById('record-count');
+            let selectedDatabase = null;
+            let fullScript = ''; 
+
+            // DBボタンにクリックイベントリスナーを追加
+            dbButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    // すべてのボタンの選択状態をリセット
+                    dbButtons.forEach(btn => btn.classList.remove('selected'));
+                    // クリックされたボタンを選択状態にする
+                    this.classList.add('selected');
+                    // 選択されたデータベースを設定
+                    selectedDatabase = this.id.includes('mysql') ? 'MySQL' : 'Cassandra';
+                    // 生成ボタンを有効化
+                    generateButton.disabled = false;
+                });
+            });
+
+            // 生成ボタンにクリックイベントリスナーを追加
+            generateButton.addEventListener('click', function () {
+                if (selectedDatabase) {
+                    generateInsert(selectedDatabase);
+                    // ダウンロードボタンを有効化
+                    downloadButton.disabled = false;
+                } else {
+                    alert('データベースを選択してください。');
+                }
+            });
+
+            // INSERT構文を生成する関数
+            function generateInsert(database) {
+                fullScript = ''; 
+                let script = '';
+                const tableName = 'test_table'; 
+                const numRecords = parseInt(recordCountInput.value, 10) || 10;
+
+                if (database === 'MySQL') {
+                    script += `INSERT INTO ${tableName} (id, name, email, address) VALUES\n`;
+                    for (let i = 1; i <= numRecords; i++) {
+                        const name = faker.person.fullName(); 
+                        const email = faker.internet.email();
+                        const address = faker.location.streetAddress(); 
+                        script += `(${i}, '${name}', '${email}', '${address.replace(/'/g, "''")}')${i < numRecords ? ',' : ';'}\n`;
+                    }
+                } else if (database === 'Cassandra') {
+                    for (let i = 1; i <= numRecords; i++) {
+                        const name = faker.person.fullName(); 
+                        const email = faker.internet.email();
+                        const address = faker.location.streetAddress(); 
+                        script += `INSERT INTO your_keyspace.${tableName} (id, name, email, address) VALUES (${i}, '${name}', '${email}', '${address.replace(/'/g, "''")}');\n`;
+                    }
+                }
+
+                fullScript = script.trim(); // 全体のスクリプトを保存
+                const resultLines = fullScript.split('\n');
+                insertScript.value = resultLines.slice(0, 10).join('\n'); // 最大100行のみ表示
+            }
+
+            // ダウンロードボタンにクリックイベントリスナーを追加
+            downloadButton.addEventListener('click', function () {
+                if (fullScript) {
+                    downloadFile(fullScript, `${selectedDatabase.toLowerCase()}_insert.txt`);
+                } else {
+                    alert('ダウンロードする内容がありません。生成してください。');
+                }
+            });
+
+            // テキストファイルをダウンロードする関数
+            function downloadFile(content, filename) {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    </body>
+</html>
